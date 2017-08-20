@@ -34,8 +34,12 @@ int main()
 
   PID pid;
   // TODO: Initialize the pid variable.
+  //pid.Init(0.4884067975842662, 1.274358677148635e-12, 5.096416801295116);
+  pid.Init(0.4875, -1.0e-5, 5.09);
+  int count = 0;
+  double sqr_err = 0.0;
 
-  h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  h.onMessage([&pid, &count, &sqr_err](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -50,16 +54,19 @@ int main()
           double cte = std::stod(j[1]["cte"].get<std::string>());
           double speed = std::stod(j[1]["speed"].get<std::string>());
           double angle = std::stod(j[1]["steering_angle"].get<std::string>());
-          double steer_value;
+          double steer_value = 0.0;
           /*
           * TODO: Calcuate steering value here, remember the steering value is
           * [-1, 1].
           * NOTE: Feel free to play around with the throttle and speed. Maybe use
           * another PID controller to control the speed!
           */
+          pid.UpdateError(cte);
+          steer_value = pid.getOutput();
+          sqr_err += (cte*cte);
           
           // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << " Speed: " << speed << " Angle: " << angle  << std::endl;
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
@@ -67,6 +74,10 @@ int main()
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+          if (count == 1700) {
+            std::cout << "Sqr Error: " << sqr_err << std::endl;
+          }
+          count++;
         }
       } else {
         // Manual driving
@@ -76,6 +87,7 @@ int main()
     }
   });
 
+  
   // We don't need this since we're not using HTTP but if it's removed the program
   // doesn't compile :-(
   h.onHttpRequest([](uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t, size_t) {
